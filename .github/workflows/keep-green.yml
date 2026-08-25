@@ -1,0 +1,43 @@
+name: keep-green
+
+on:
+  schedule:
+    # UTC 01:17 / 05:17 / 09:17 / 13:17  = 北京时间 09:17 / 13:17 / 17:17 / 21:17
+    - cron: '17 1,5,9,13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Random activity commits
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git config user.name 'fafasco16'
+          git config user.email 'fafasco16@gmail.com'
+
+          # ~25% chance to skip this round (looks natural)
+          if [ $((RANDOM % 100)) -lt 25 ]; then
+            echo "skipping this round"
+            exit 0
+          fi
+
+          mkdir -p activity
+          N=$((RANDOM % 2 + 1))
+          MSGS=("docs: update activity log" "chore: record activity" "docs: daily log entry")
+          for i in $(seq 1 $N); do
+            echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) run ${GITHUB_RUN_ID}" >> activity/log.txt
+            git add activity/log.txt
+            git commit --quiet -m "${MSGS[$((RANDOM % ${#MSGS[@]}))]}"
+            sleep 3
+          done
+
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin HEAD:main
